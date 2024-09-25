@@ -7,14 +7,15 @@
   
 #### SETUP ####
 # Attach sf for its functions. Note: you will receive an error, this is something related to the package
-# install.packages("sf")
+install.packages("sf")
 library(sf)
 # Attach the tidyverse for tidyr, dplyr, and ggplot functions
-# install.packages("tidyverse")
+install.packages("tidyverse")
 library(tidyverse)
 # Attach trex for the LDC access
 # install.packages("trex")
-library(trex)
+
+#library(trex)
 # Attach beepr to tell you when your code has run
 # install.packages("beepr")
 library(beepr)
@@ -26,7 +27,7 @@ library(lubridate)
 
 #### CONFIG ####
 # Setting the path to the geodatabase 
-gdb_path <- "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\LTDL_July_2022_Release_Geodatabase\\LTDL_Release_20220715.gdb"
+gdb_path <- "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\LTDL_July_2022_Release_Geodatabase\\LTDL_Release_20220715.gdb"
 # Setting the path for Nelson who is helping with this code
 # gdb_path <- "C:/Users/Nelson/Desktop/garbage/ltdl/LTDL_Release_20220715.gdb"
 
@@ -106,17 +107,17 @@ treatment_lookup_table <- left_join(x = treatment_lookup_table_treatment,
 # indicators_df <- read.csv("indicators_df.csv")
 
 # Note: headers_df and indicators_df have different numbers of observations
-missing_primarykeys <- headers_df$PrimaryKey[!(headers_df$PrimaryKey %in% indicators_df$PrimaryKey)]
+# missing_primarykeys <- headers_df$PrimaryKey[!(headers_df$PrimaryKey %in% indicators_df$PrimaryKey)]
 # There are 90 PrimaryKeys that are missing their indicator information
 
 #### MUNGING ####
 ##### Cleaning coordinates #####
 # Header info includes coordinates in NAD8 
 # Converting the data frame into an sf object
-headers_sf <- sf::st_as_sf(x = headers_df,
-                           coords = c("Longitude_NAD83",
-                                      "Latitude_NAD83"),
-                           crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
+#headers_sf <- sf::st_as_sf(x = headers_df,
+                           #coords = c("Longitude_NAD83",
+                                     #"Latitude_NAD83"),
+                          #crs = "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs")
 
 #####Changing geometries#####
 
@@ -126,8 +127,8 @@ treatment_polygons_sf <- sf::st_cast(x = treatment_polygons_sf,
 
 # Ensuring the projections match
 # Applying the Coordinate Reference System from headers_sf to the polygons
-treatment_polygons_sf <- sf::st_transform(x = treatment_polygons_sf,
-                                          crs = sf::st_crs(headers_sf))
+# treatment_polygons_sf <- sf::st_transform(x = treatment_polygons_sf,
+                                         # crs = sf::st_crs(headers_sf))
 
 ##### Cleaning errors in database #####
 # Sanitizing geometry errors within the polygon collection
@@ -146,7 +147,7 @@ treatment_polygons_repaired_sf <- sf::st_buffer(x = sf::st_transform(treatment_p
 # Note: Maintaining each sf object as a distinct object to avoid overwriting data
 # Re-projecting back into degrees now that it's buffered
 treatment_polygons_repaired_sf <- sf::st_transform(x = treatment_polygons_repaired_sf,
-                                                   crs = sf::st_crs(headers_sf))
+                                                   crs = "+proj=aea +lat_1=29.5 +lat_2=42.5")
 
 # Note: This will result in a warning due to the re-projections from degrees to meters (Albers Equal Area)
 
@@ -185,18 +186,21 @@ head(treatment_polygons_attributed_sf)
 # Changing the year to a character (string) from a number
 treatment_polygons_attributed_sf$Year <- as.character(treatment_polygons_attributed_sf$Year)
 
-# creating a dataframe with only years 1986 and Implemented
-implemented_polygons_sf <- subset(treatment_polygons_attributed_sf, Year > 1986 & Plan_Imp == "Implemented")
-unique(implemented_polygons_sf$Trt_Type_Major)
+# creating an object for the restoration treatments of interest
+treatment_types <- c("Herbicide/Weeds/Chemical",
+                     "Prescribed Burn",
+                     "Seeding",
+                     "Soil Stabilization",
+                     "Vegetation/Soil Manipulation")
 
-polygons_with_percent <- implemented_polygons_sf[grepl("%|percent", implemented_polygons_sf$Objectives), ]
 
-seeding_percent_df <- polygons_with_percent %>%
-  filter(Trt_Type_Major == "Seeding")
+# subsetting the data to include years at 1986, implemented plan, and treatment types
+restoration_polygons_sf <- subset(treatment_polygons_attributed_sf, Year > 1986 & Plan_Imp == "Implemented" & Trt_Type_Major == treatment_types)
 
 # Export to Excel
-writexl::write_xlsx(seeding_percent_df, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\seeding_percent_df.xlsx")
+# install.packages("writexl")
 
+# writexl::write_xlsx(implemented_polygons_sf, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\implemented_ltdl_df.xlsx")
 
 ### Reducing polygon to state of Utah
 # Step 1: Get Utah boundary (example using rnaturalearth)
@@ -225,6 +229,29 @@ library(writexl)
 
 utah_polygons_df <- sf::st_drop_geometry(utah_polygons_sf)
 
+
+########KRISTINA: add in a command to keep Trt_IDs from the same year##########
+
+##### Removing Prj_IDs with multiple Trt_IDs from utah_polygons_sf #####
+# Removing projects that had multiple treatment events
+project_record_counts <- table(treatment_lookup_table$Prj_ID)
+# Finding projects that occur only once
+single_project_ids <- names(project_record_counts)[project_record_counts == 1]
+# Slicing data to only records that correspond to those projects
+utah_sf <- utah_polygons_sf[utah_polygons_sf$Prj_ID %in% single_project_ids, ]
+
+object.size(single_records_sf)
+
+attach(single_records_sf)
+sorted_df <- single_records_sf[order(GlobalID), ]
+detach(single_records_sf)
+
+
+
+
+
+
+### MAINTAINING FULL LTDL
 # Export to Excel
 writexl::write_xlsx(utah_polygons_df, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\utah_polygons.xlsx")
 
@@ -243,6 +270,12 @@ restoration_polygons_sf <- subset(treatment_polygons_attributed_sf, Year > 1986 
 
 joined_sf <- sf::st_join(x = restoration_polygons_sf,
                          y = headers_sf)
+
+
+
+
+
+
 
 ##### Removing Prj_IDs with multiple Trt_IDs from restoration_df #####
 # Removing projects that had multiple treatment events
