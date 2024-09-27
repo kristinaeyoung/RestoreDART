@@ -1,3 +1,7 @@
+
+#### Figure out a way to filter out riparian projects
+#### Get rid of complex spatial features
+
 ---
   # title: "Scope of Work - USDA Jornada Experimental Range Post-Doc"
   # author: "Kristina Young"
@@ -164,27 +168,76 @@ treatment_polygons_attributed_sf <- dplyr::left_join(x = treatment_polygons_repa
 ########################## GOOGLE EARTH ENGINE ################################
 #### Writing out a shape file of restoration LTDL for Google Earth Engine ####
 
-# Creating comparable years
+# Creating comparable years for the completed date
 # Using stringr::str_extract() to extract part of the date strings
 # Specifically:
 # 1) the first four consecutive digits it can find (the year)
 # 2) coerces that from a string into a numeric value
-treatment_polygons_attributed_sf$Year <- as.numeric(stringr::str_extract 
+treatment_polygons_attributed_sf$Year_comp <- as.numeric(stringr::str_extract 
                                         (string = treatment_polygons_attributed_sf$Comp_Date, pattern = "\\d{4}"))
 # Removing all of the NAs
-bad_date_indices <- is.na(treatment_polygons_attributed_sf$Year)
+bad_date_indices <- is.na(treatment_polygons_attributed_sf$Year_comp)
 
 # Stripping out all the rows/observations with bad dates in either variable:
 # 1) gather all the indices where the sampling dates were not (!): NAs 
 # 2) AND the completion dates were not (!): bad
 treatment_polygons_attributed_sf <- treatment_polygons_attributed_sf[!bad_date_indices, ]
 # Checking to see if the data framelooks good
-treatment_polygons_attributed_sf$Year
+treatment_polygons_attributed_sf$Year_comp
 # examining the 
 head(treatment_polygons_attributed_sf)
 
 # Changing the year to a character (string) from a number
-treatment_polygons_attributed_sf$Year <- as.character(treatment_polygons_attributed_sf$Year)
+treatment_polygons_attributed_sf$Year <- as.character(treatment_polygons_attributed_sf$Year_comp)
+
+
+
+
+# Creating comparable years for the completed date
+# Using stringr::str_extract() to extract part of the date strings
+# Specifically:
+# 1) the first four consecutive digits it can find (the year)
+# 2) coerces that from a string into a numeric value
+treatment_polygons_attributed_sf$Year_comp <- as.numeric(stringr::str_extract 
+                                                         (string = treatment_polygons_attributed_sf$Comp_Date, pattern = "\\d{4}"))
+# Removing all of the NAs
+bad_date_indices <- is.na(treatment_polygons_attributed_sf$Year_comp)
+
+# Stripping out all the rows/observations with bad dates in either variable:
+# 1) gather all the indices where the sampling dates were not (!): NAs 
+# 2) AND the completion dates were not (!): bad
+treatment_polygons_attributed_sf <- treatment_polygons_attributed_sf[!bad_date_indices, ]
+# Checking to see if the data framelooks good
+treatment_polygons_attributed_sf$Year_comp
+# examining the 
+head(treatment_polygons_attributed_sf)
+
+# Changing the year to a character (string) from a number
+treatment_polygons_attributed_sf$Year_comp <- as.character(treatment_polygons_attributed_sf$Year_comp)
+
+
+# Creating comparable years for the initiation date
+# Using stringr::str_extract() to extract part of the date strings
+# Specifically:
+# 1) the first four consecutive digits it can find (the year)
+# 2) coerces that from a string into a numeric value
+treatment_polygons_attributed_sf$Year_init <- as.numeric(stringr::str_extract 
+                                                         (string = treatment_polygons_attributed_sf$Init_Date, pattern = "\\d{4}"))
+# Removing all of the NAs
+bad_date_indices <- is.na(treatment_polygons_attributed_sf$Year_init)
+
+# Stripping out all the rows/observations with bad dates in either variable:
+# 1) gather all the indices where the sampling dates were not (!): NAs 
+# 2) AND the completion dates were not (!): bad
+treatment_polygons_attributed_sf <- treatment_polygons_attributed_sf[!bad_date_indices, ]
+# Checking to see if the data framelooks good
+treatment_polygons_attributed_sf$Year_init
+# examining the 
+head(treatment_polygons_attributed_sf)
+
+# Changing the year to a character (string) from a number
+treatment_polygons_attributed_sf$Year_init <- as.character(treatment_polygons_attributed_sf$Year_init)
+
 
 # creating an object for the restoration treatments of interest
 treatment_types <- c("Herbicide/Weeds/Chemical",
@@ -213,10 +266,10 @@ usa <- ne_states(country = "united states of america", returnclass = "sf")
 utah_boundary <- subset(usa, name == "Utah")
 
 # Step 2: Ensure CRS match
-utah_boundary <- sf::st_transform(utah_boundary, crs = sf::st_crs(implemented_polygons_sf))
+utah_boundary <- sf::st_transform(utah_boundary, crs = sf::st_crs(restoration_polygons_sf))
 
 # Step 3: Filter polygons located within Utah
-utah_polygons_sf <- implemented_polygons_sf[sf::st_intersects(implemented_polygons_sf, utah_boundary, sparse = FALSE), ]
+utah_polygons_sf <- restoration_polygons_sf[sf::st_intersects(restoration_polygons_sf, utah_boundary, sparse = FALSE), ]
 
 # Step 4: View the resulting polygons
 head(utah_polygons_sf)
@@ -224,13 +277,14 @@ head(utah_polygons_sf)
 # write this polygon as a shapefile
 st_write(utah_polygons_sf, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\utah_polygons.shp")
 
+is_spatial <- st_is(utah_polygons_sf, "sf")
+print(is_spatial)
+
 # exporting Utah as a dataframe
-library(writexl)
+# library(writexl)
 
-utah_polygons_df <- sf::st_drop_geometry(utah_polygons_sf)
+# utah_polygons_df <- sf::st_drop_geometry(utah_polygons_sf)
 
-
-########KRISTINA: add in a command to keep Trt_IDs from the same year##########
 
 ##### Removing Prj_IDs with multiple Trt_IDs from utah_polygons_sf #####
 # Removing projects that had multiple treatment events
@@ -247,11 +301,197 @@ sorted_df <- single_records_sf[order(GlobalID), ]
 detach(single_records_sf)
 
 
+#### MAINTAINING POLYGONS THAT HAVE MULTIPLE TREATMENTS IN THE SAME YEAR ####
+
+# Step 1: Count the number of distinct years for each Prj_ID
+year_counts <- utah_polygons_sf %>%
+  group_by(Prj_ID) %>%
+  summarise(distinct_years = n_distinct(Year), .groups = 'drop')
+head(year_counts)
+summary(year_counts$distinct_years)
+
+# Step 2: Identify Prj_IDs that occur in exactly one distinct year
+single_year_ids <- year_counts$Prj_ID[year_counts$distinct_years == 1]
+
+# Step 3: Filter the original data frame to include only those Prj_IDs
+final_single_year_sf <- utah_polygons_sf %>%
+  filter(Prj_ID %in% single_year_ids)
+
+# Checking the result
+head(final_single_year_sf)
+is_spatial <- st_is(final_single_year_sf, "sf")
+print(is_spatial)
+
+checking <- final_single_year_sf %>%
+  filter(Prj_ID == 5431) %>%
+  select(Year)
+
+# Display the Year column
+checking
+
+# Add a new column to indicate if multiple treatments have occurred in the same year
+# Step 1: Add a column that indicates if a Prj_ID occurs multiple times
+final_year_sf <- final_single_year_sf  %>%
+  group_by(Prj_ID) %>%
+  mutate(multiple_treatments = n() > 1) %>%
+  ungroup()  # Ensure ungrouping after mutation
+
+# filter out rows that have Year_init before 1991 and rows that have Year_comp after 2018
+# Step 1: Filter rows based on Year_init and Year_comp conditions
+final_year_sf_filtered <- final_year_sf %>%
+  filter(Year_init >= 1991 & Year_comp <= 2018)
+
+# View the filtered data
+head(final_year_sf_filtered)
+
+# confirming that the spatial data is still there
+is_spatial_inherits <- inherits(final_year_sf_filtered, "sf")
+print(is_spatial_inherits)
+
+# removing layers with fire
+
+## fire boundareis 
+fire_boundaries <- sf::st_read("mtbs_perims_DD.shp")
+
+# Filter to keep only valid geometries
+valid_fire_boundaries <- fire_boundaries[st_is_valid(fire_boundaries), ]
+
+## now to restrict the treatments to areas outside of wildfires 
+wildfires <- valid_fire_boundaries %>%   filter(Incid_Type == "Wildfire")
+# check Coordinate refernce system
+st_crs(wildfires) == st_crs(final_year_sf_filtered)
+# transform one of the polygons to the other 
+fire_boundaries <- st_transform(wildfires, st_crs(final_year_sf_filtered))
+# check if we fixed it 
+st_crs(fire_boundaries) == st_crs(final_year_sf_filtered)
+# Identify intersections
+intersections <- st_intersects(fire_boundaries, final_year_sf_filtered, sparse = FALSE)
+# Find indices of polygons in 'polys' that intersect with any polygon in 'fire_boundaries'
+intersecting_indices <- which(rowSums(intersections) > 0)
+# Create subset of polys that intersect with fire_boundaries
+polys_intersecting <- final_year_sf_filtered[intersecting_indices, ]
+# Create subset of polys that do not intersect with fire_boundaries
+filtered_nonwildfire_sf <- final_year_sf_filtered[-intersecting_indices, ]
+
+####### FILTERING BY POLYGON SIZE #######
+
+# 1. Calculate area (in the same units as the projection, e.g., square meters for UTM)
+filtered_nonwildfire_sf$area <- st_area(filtered_nonwildfire_sf)
+# Convert area from square meters to square kilometers
+filtered_nonwildfire_sf$area_km2 <- filtered_nonwildfire_sf$area / 1e6  # 1 km² = 1,000,000 m²
+
+# 2. Function to calculate the shortest axis length based on the bounding box of each geometry
+shortest_axis_length <- function(geom) {
+  bbox <- st_bbox(geom)
+  min_length <- min(abs(bbox["xmax"] - bbox["xmin"]), abs(bbox["ymax"] - bbox["ymin"]))
+  return(min_length)
+}
+
+# 3. Apply the function to each geometry in the sf object to get the shortest axis length
+filtered_nonwildfire_sf$shortest_axis_length_m <- sapply(st_geometry(filtered_nonwildfire_sf), shortest_axis_length)
+
+# Now you have two new columns: `area` and `shortest_axis_length`
+head(filtered_nonwildfire_sf)
+
+
+
+# write this polygon as a shapefile
+# st_write(filtered_nonwildfire_sf, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\filtered_nonwildfire_sf.shp")
+
+# Deciding on the polygons to send to Gayle to test
+
+specific_prj_id <- 157  # Replace this with the Prj_ID you are interested in
+
+# Filter the dataset for the specific Prj_ID
+specific_row <- filtered_nonwildfire_sf %>%
+  filter(Prj_ID == specific_prj_id)
+
+# Display the full row (with all headers/columns) for the specific Prj_ID
+print(specific_row)
+
+
+### Picking specific prj_IDs to sent to for DART analysis
+# Seeding 157, 1033
+# Vegetation/Soil Manipulation 1101, 2389 
+# Prescribed burn 3352, 5550
+# Herbicide/Weesd/Chemicals 16774,1223
+
+# Define the specific Prj_IDs to include
+selected_prj_ids <- c(157, 1033, 1101, 2389, 3352, 5550, 16774, 12233)
+
+# Create a new sf object that filters the selected Prj_IDs, selects the desired columns, and renames them
+filtered_sf <- filtered_nonwildfire_sf %>%
+  filter(Prj_ID %in% selected_prj_ids) %>%  # Filter based on the selected Prj_IDs
+  select(Prj_ID, Trt_Type_Major, Year_comp) %>%  # Select the specified columns
+  rename(polyID = Prj_ID, trtYear = Year_comp)  # Rename the columns
+
+# Display the new sf data
+print(filtered_sf)
+
+
+## Mapping out the polygons to look at interactively
+# Load the required libraries
+# Load the required libraries
+library(leaflet)
+library(sf)
+library(RColorBrewer)
+
+# Ensure polyID is a factor
+filtered_map_sf$polyID <- as.factor(filtered_sf$polyID)
+
+# Create a color palette based on polyID as a factor
+palette <- colorFactor(palette = brewer.pal(n = length(unique(filtered_sf$polyID)), "Set3"), 
+                       domain = filtered_sf$polyID)
+
+# Calculate centroids of the polygons for map centering
+centroids <- st_centroid(filtered_sf)
+
+# Extract mean longitude and latitude for centering the map
+mean_lon <- mean(st_coordinates(centroids)[, 1], na.rm = TRUE)
+mean_lat <- mean(st_coordinates(centroids)[, 2], na.rm = TRUE)
+
+# Create a leaflet map
+leaflet(data = filtered_map_sf) %>%
+  addTiles() %>%  # Add default OpenStreetMap tiles
+  addPolygons(color = ~palette(polyID), weight = 1, fillOpacity = 0.5, 
+              highlightOptions = highlightOptions(color = "red", weight = 2, bringToFront = TRUE),
+              popup = ~paste("polyID:", polyID, "<br>",
+                             "Activity ended in:", trtYear, "<br>",
+                             "Methods: ", Trt_Type_Major, "<br>")) %>%
+  setView(lng = mean_lon, lat = mean_lat, zoom = 10) %>%  # Center the map
+  addLegend("bottomright", pal = palette, values = filtered_sf$polyID, 
+            title = "polyID", 
+            labFormat = labelFormat(prefix = "polyID: "))
+
+
+# writing poylgons to send for DART analysis
+st_write(filtered_sf, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\filtered_sf.shp")
+
+## read in the WRI polygons
+WRI_sf <- sf::st_read("wri_test_trt.shp")
+
+head(WRI_sf)
+head(filtered_sf)
+
+WRI_renamed_sf <- WRI_sf %>% rename(Trt_Type_Major = Trt_T_M, SHAPE = geometry) %>% select (polyID, Trt_Type_Major, trtYear, SHAPE)
+
+test_dart_polys_sf <- rbind(WRI_renamed_sf, filtered_sf)
+
+st_write(test_dart_polys_sf, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\test_dart_polys_sf.shp")
 
 
 
 
-### MAINTAINING FULL LTDL
+
+
+
+
+
+
+
+
+#######NEW CODE##########
+#### MAINTAINING FULL LTDL
 # Export to Excel
 writexl::write_xlsx(utah_polygons_df, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\RAP_DART_WRI\\RAP_DART_WRI\\utah_polygons.xlsx")
 
