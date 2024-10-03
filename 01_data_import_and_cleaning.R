@@ -1,7 +1,4 @@
 
-#### Figure out a way to filter out riparian projects
-#### Get rid of complex spatial features
-
 ---
   # title: "Scope of Work - USDA Jornada Experimental Range Post-Doc"
   # author: "Kristina Young"
