@@ -1,3 +1,7 @@
+##### THIS IS THE ORIGINAL FILE OF ALL THE CODE
+# THIS HAS BEEN SEGMENTED DOWN to 01 and 02 R script files
+# Do NOT use this code after 2024_10_03
+
 
 #### Figure out a way to filter out riparian projects
 #### Get rid of complex spatial features
