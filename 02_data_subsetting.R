@@ -14,8 +14,9 @@ library(writexl)
 # 1. applicable restoration treatments
 # 2. occurred within the state of Utah
 # 3. occurred within a 12 month period
-# 4. have not experienced a wildfire
-# 5. are less than 1/2 km squared **** THIS REQUIREMENT HAS BEEN REMOVE FOR NOW
+# 4. do not occur in a wetland or riparian area
+# 5. have not experienced a wildfire
+# 6. are less than 1/2 km squared **** THIS REQUIREMENT HAS BEEN REMOVE FOR NOW
 
 # Reading the in imported and combined shape file
 treatment_polygons_cleaned_sf <- st_read("treatment_polygons_cleaned_sf.shp")
@@ -23,12 +24,25 @@ head(treatment_polygons_cleaned_sf)
 
 
 #### STEP 1: applicable restoration treatments ####
+unique_values_mjr <- unique(treatment_polygons_cleaned_sf$Trt_T_M)
+print(unique_values)
+
 # creating an object for the restoration treatments of interest
-treatment_types <- c(198 )
+treatment_types <- c("Herbicide/Weeds/Chemical",
+                     "Prescribed Burn",
+                     "Seeding",
+                     "Soil Stabilization",
+                     "Vegetation/Soil Manipulation")
 
 # subsetting the data to include years at 1986, implemented plan, and treatment types
 restoration_polygons_sf <- subset(treatment_polygons_cleaned_sf, Year > 1986 & Pln_Imp == "Implemented" & Trt_T_M == treatment_types)
 
+# Looking at categorizations of treatments
+unique_values_sub <- unique(restoration_polygons_sf$Trt_T_S)
+print(unique_values_sub)
+
+unique_values_T <- unique(restoration_polygons_sf$Trtmn_T)
+print(unique_values_T)
 
 #### STEP 2. occurred within the state of Utah ####
 # Step 1: Get Utah boundary (example using rnaturalearth)
@@ -131,11 +145,97 @@ result_df <- result %>%
 final_year_sf_filtered2 <- final_year_sf_filtered %>%
   filter(!(Prj_ID %in% result_df$Prj_ID))
 
+# Assuming final_year_sf_filtered is your data frame
+result <- final_year_sf_filtered %>%
+  group_by(Prj_ID) %>%                                 # Group by Prj_ID
+  summarise(
+    unique_Trt_IDs = n_distinct(Trt_ID),              # Count distinct Trt_IDs
+    Trt_T_M = paste(unique(Trt_T_M), collapse = ", ") # Concatenate unique Trt_T_M values
+  ) %>%
+  filter(unique_Trt_IDs > 1)                          # Keep only those with more than 1 unique Trt_ID
+
+# Print the result
+print(result)
+
 # Show the new spatial dataframe
 final_year_sf_filtered2
 
+# showing how many rows have the same Prj_ID but different Trt_ID
+# Assuming final_year_sf_filtered2 is your data frame
+result <- final_year_sf_filtered2 %>%
+  group_by(Prj_ID) %>%                                 # Group by Prj_ID
+  summarise(
+    unique_Trt_IDs = n_distinct(Trt_ID),              # Count distinct Trt_IDs
+    Trt_T_M = paste(unique(Trt_T_M), collapse = ", ") # Concatenate unique Trt_T_M values
+  ) %>%
+  filter(unique_Trt_IDs > 1)                          # Keep only those with more than 1 unique Trt_ID
 
-#### STEP 4. have not experienced a wildfire ####
+# Print the result
+print(result)
+
+
+#### STEP 4. are not in wetlands or riparian areas ####
+# SOURCE of Wetland and riparian spatial data:
+# https://www.fws.gov/program/national-wetlands-inventory/download-state-wetlands-data
+
+## wetland boundaries 
+wetlands_UT <- sf::st_read("Utah_Wetlands.shp")
+
+# Filter to keep only valid geometries
+valid_wetland_boundaries <- wetlands_UT[st_is_valid(wetlands_UT), ]
+
+# check Coordinate refernce system
+st_crs(valid_wetland_boundaries) == st_crs(final_year_sf_filtered2)
+
+# transform one of the polygons to the other 
+wetland_boundaries <- st_transform(valid_wetland_boundaries, st_crs(final_year_sf_filtered2))
+
+# check if we fixed it 
+st_crs(wetland_boundaries) == st_crs(final_year_sf_filtered2)
+
+# Identify intersections
+intersections <- st_intersects(wetland_boundaries, final_year_sf_filtered2, sparse = FALSE)
+
+# Find indices of polygons in 'polys' that intersect with any polygon in 'wetland_boundaries'
+intersecting_indices <- which(rowSums(intersections) > 0)
+
+# Create subset of polys that intersect with wetland_boundaries
+polys_intersecting <- final_year_sf_filtered2[intersecting_indices, ]
+
+# Create subset of polys that do not intersect with wetland_boundaries
+final_year_sf_filtered3 <- final_year_sf_filtered2[-intersecting_indices, ]
+# There are no overlaps with wetlands
+
+## RIPARIAN BOUNDARIES
+riparian_UT <- sf::st_read("UT_Riparian.shp")
+
+# Filter to keep only valid geometries
+valid_riparian_boundaries <- riparian_UT[st_is_valid(riparian_UT), ]
+
+# check Coordinate reference system
+st_crs(valid_riparian_boundaries) == st_crs(final_year_sf_filtered3)
+
+# transform one of the polygons to the other 
+riparian_boundaries <- st_transform(valid_riparian_boundaries, st_crs(final_year_sf_filtered3))
+
+# check if we fixed it 
+st_crs(riparian_boundaries) == st_crs(final_year_sf_filtered3)
+
+# Identify intersections
+intersections_rip <- st_intersects(riparian_boundaries, final_year_sf_filtered3, sparse = FALSE)
+
+# Find indices of polygons in 'polys' that intersect with any polygon in 'riparian_boundaries'
+intersecting_indices_rip <- which(rowSums(intersections_rip) > 0)
+
+# Create subset of polys that intersect with riparian_boundaries
+polys_intersecting_rip <- final_year_sf_filtered3[intersecting_indices_rip, ]
+
+# Create subset of polys that do not intersect with riparian_boundaries
+final_year_sf_filtered4 <- final_year_sf_filtered3[-intersecting_indices_rip, ]
+# There are no overlaps with riparian
+
+
+#### STEP 5. have not experienced a wildfire ####
 ## fire boundaries 
 fire_boundaries <- sf::st_read("mtbs_perims_DD.shp")
 
@@ -146,49 +246,76 @@ valid_fire_boundaries <- fire_boundaries[st_is_valid(fire_boundaries), ]
 wildfires <- valid_fire_boundaries %>%   filter(Incid_Type == "Wildfire")
 
 # check Coordinate refernce system
-st_crs(wildfires) == st_crs(final_year_sf_filtered2)
+st_crs(wildfires) == st_crs(final_year_sf_filtered4)
 
 # transform one of the polygons to the other 
-fire_boundaries <- st_transform(wildfires, st_crs(final_year_sf_filtered2))
+fire_boundaries <- st_transform(wildfires, st_crs(final_year_sf_filtered4))
 
 # check if we fixed it 
-st_crs(fire_boundaries) == st_crs(final_year_sf_filtered2)
+st_crs(fire_boundaries) == st_crs(final_year_sf_filtered4)
 
 # Identify intersections
-intersections <- st_intersects(fire_boundaries, final_year_sf_filtered2, sparse = FALSE)
+intersections <- st_intersects(fire_boundaries, final_year_sf_filtered4, sparse = FALSE)
 
 # Find indices of polygons in 'polys' that intersect with any polygon in 'fire_boundaries'
 intersecting_indices <- which(rowSums(intersections) > 0)
 
 # Create subset of polys that intersect with fire_boundaries
-polys_intersecting <- final_year_sf_filtered2[intersecting_indices, ]
+polys_intersecting <- final_year_sf_filtered4[intersecting_indices, ]
 # this single polygon is not related to a post-fire recovery
 
 # Create subset of polys that do not intersect with fire_boundaries
-filtered_nonwildfire_sf3 <- final_year_sf_filtered2[-intersecting_indices, ]
+filtered_nonwildfire_sf5 <- final_year_sf_filtered4[-intersecting_indices, ]
 
 
-#### STEP 5: are less than half a km squared  ####
-# WE ARE REMOVING THIS FOR NOW
+#### STEP 6: are less than half a km squared  ####
 
 # Calculate area (in the same units as the projection, e.g., square meters for UTM)
-# filtered_nonwildfire_sf3$area <- st_area(filtered_nonwildfire_sf3)
+filtered_nonwildfire_sf5$area <- st_area(filtered_nonwildfire_sf5)
 
 # Convert area from square meters to square kilometers
-# filtered_nonwildfire_sf3$area_km2 <- (filtered_nonwildfire_sf3$area / 1e6) / 2  # 1 km² = 1,000,000 m², divide by 2 for half
+filtered_nonwildfire_sf5$area_km2 <- (filtered_nonwildfire_sf5$area / 1e6) / 2  # 1 km² = 1,000,000 m², divide by 2 for half
 
 # Function to calculate the shortest axis length based on the bounding box of each geometry
-# shortest_axis_length <- function(geom) {
-  # bbox <- st_bbox(geom)
-  # min_length <- min(abs(bbox["xmax"] - bbox["xmin"]), abs(bbox["ymax"] - bbox["ymin"]))
-  # return(min_length)
-# }
+shortest_axis_length <- function(geom) {
+  bbox <- st_bbox(geom)
+  min_length <- min(abs(bbox["xmax"] - bbox["xmin"]), abs(bbox["ymax"] - bbox["ymin"]))
+  return(min_length)
+ }
 
 # Apply the function to each geometry in the sf object to get the shortest axis length
-# filtered_nonwildfire_sf3$shortest_axis_length_m <- sapply(st_geometry(filtered_nonwildfire_sf3), shortest_axis_length)
+filtered_nonwildfire_sf5$shortest_axis_length_m <- sapply(st_geometry(filtered_nonwildfire_sf5), shortest_axis_length)
 
 # Now you have two new columns: area and shortest_axis_length
-# head(filtered_nonwildfire_sf3)
+head(filtered_nonwildfire_sf5)
+
+# Ensure area_km2 is numeric
+filtered_nonwildfire_sf5$area_km2 <- as.numeric(filtered_nonwildfire_sf5$area_km2)
+
+# Create a histogram of treated area sizes
+ggplot(filtered_nonwildfire_sf5, aes(x = area_km2)) +
+  geom_histogram(binwidth = 0.1, fill = "steelblue", color = "black") +  # Adjust binwidth as needed
+  labs(
+    title = "Distribution of Treated Area Size",
+    x = "Treated Area Size (km²)",
+    y = "Frequency"
+  ) +
+  theme_minimal() +                             # Use a minimal theme for better appearance
+  scale_x_continuous(breaks = seq(0, 80, by = 10))
+
+# Filter out areas greater than 10 km²
+filtered_data <- filtered_nonwildfire_sf5[filtered_nonwildfire_sf5$area_km2 <= 10, ]
+
+# Create a histogram of treated area sizes
+ggplot(filtered_data, aes(x = area_km2)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "black") +  # Set binwidth to 1 km²
+  labs(
+    title = "Distribution of Treated Area Size (≤ 10 km²)",
+    x = "Treated Area Size (km²)",
+    y = "Frequency"
+  ) +
+  theme_minimal() +                             # Use a minimal theme for better appearance
+  scale_x_continuous(breaks = seq(0, 10, by = 1))
 
 # Extract numeric values from the area_km2 column and convert to numeric
 # filtered_nonwildfire_sf3$area_km2_numeric <- as.numeric(str_extract(filtered_nonwildfire_sf3$area_km2, "^[0-9.]+"))
@@ -204,5 +331,5 @@ filtered_nonwildfire_sf3 <- final_year_sf_filtered2[-intersecting_indices, ]
 # head(filtered_nonwildfire_sf3)
 
 # write this polygon as a shapefile
-st_write(filtered_nonwildfire_sf3, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\filtered_nonwildfire_sf.shp")
+st_write(filtered_nonwildfire_sf5, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\filtered_nonwildfire_sf.shp")
 

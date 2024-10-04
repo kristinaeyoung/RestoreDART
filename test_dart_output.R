@@ -5,7 +5,7 @@ library(tidyterra)
 
 ## load in the DART outputs from preliminary polygons from Gayle 
 # bring in results for one polygon
-load("D:/Kristina_DART/wri-testpolys-dartresults/outdir/ID_1341.RData")
+load("C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\outdir\\ID_1033.RData")
 
 ### polygons considered 
 head(padpoly) # the polygon considered 

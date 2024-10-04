@@ -85,18 +85,22 @@ check_df <- LTDL_LDC_sf %>%
 
 
 #### STEP 3: Create map showing overlap LTDL and LDC plots
-# Make a map of the polygons that also have LDC data
+# Assuming `joined_sf` already has polygons, and the points are in the Latitude_NAD83 and Longitude_NAD83 columns.
+points_sf <- st_as_sf(LTDL_LDC_sf, coords = c("Longitude_NAD83", "Latitude_NAD83"), crs = 4269)  # NAD83 = EPSG:4269
+
+# Step 2: Plot the polygons and points on the map
 ggplot() +
   # Add the polygons from joined_sf
-  geom_sf(data = LTDL_LDC_sf, fill = "lightgreen", color = "darkgreen", alpha = 0.5) +
+  geom_sf(data = joined_sf, fill = "darkgreen", color = "darkgreen", alpha = 0.5) +
+  
+  # Add the points created from Latitude and Longitude in joined_sf
+  geom_sf(data = points_sf, color = "red", size = 2) +
   
   # Add labels and titles
   labs(title = "Map of Polygons and Points",
-       subtitle = "Polygons from geodatabase and points from columns x and y in joined_sf",
+       subtitle = "Polygons from geodatabase and points from Latitude/Longitude in joined_sf",
        x = "Longitude",
        y = "Latitude") +
   
   # Set the minimal theme for a clean map appearance
   theme_minimal()
-
-  
