@@ -155,5 +155,12 @@ head(treatment_polygons_attributed_sf)
 # Changing the year to a character (string) from a number
 treatment_polygons_attributed_sf$Year_init <- as.character(treatment_polygons_attributed_sf$Year_init)
 
+# Filter rows with NA in Year_comp or Year_init
+na_rows <- treatment_polygons_attributed_sf %>%
+  filter(is.na(Year_comp) | is.na(Year_init))
+
+# View the rows with NA values
+print(na_rows)
+
 st_write(treatment_polygons_attributed_sf, "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\treatment_polygons_cleaned_sf.shp")
 
