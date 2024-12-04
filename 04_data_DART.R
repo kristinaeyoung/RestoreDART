@@ -7,7 +7,7 @@
   
 # Accesing SciNet:
   # 1: Log into SciNet https://scinet.usda.gov/guides/access/
-  # 2: 90daydata/aeroldc
+  # 2: (find in the file-open -> /90daydata/aeroldc
   # 3: Request R studio session, my interactive session, RStudio, server
       # Run under aeroldc (or home directory)
       # To change: how many hours, adjust cores (5 or 10)
@@ -15,6 +15,11 @@
       # Queue: scavenger mode (Max Time: 21:00)
       # Submit request
   # 4: Connect to RStudio Session
+  
+  # Uploading Data: go to Globus and log in
+  # File Manager
+  # Collecion: scinet_ceres
+  # Path /90daydata/aeroldc
   
   # 5: DART Landscape: 
       # GH -> DART -> DART_running -> needed to run DART

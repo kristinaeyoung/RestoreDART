@@ -18,13 +18,40 @@ library(lubridate)
 # Setting the path to the geodatabase 
 gdb_path <- "C:\\Users\\Kristina\\OneDrive - New Mexico State University\\Desktop\\GIT REPOs\\Restorationsuccess\\Restorationsuccess\\LTDL_July_2022_Release_Geodatabase\\LTDL_Release_20220715.gdb"
 
+# List all layers in the geodatabase
+layers <- st_layers(gdb_path)
+
 # Reading in the treatment polygon feature class
 polygons_layer_name <- "LTDL_Treatment_Polygons"
 
 # Reading in the treatment information from the geodatabase
 lookup_table_name_treatment <- "treatment_info"
+
 # Reading in the project information from the geodatabase
 lookup_table_name_project <- "project_info"
+
+
+# Read the "equipment_used" table
+equipment_data <- st_read(dsn = gdb_path, layer = "equipment_used", quiet = TRUE)
+
+# Read the "herbicide" table
+herbicide_data <- st_read(dsn = gdb_path, layer = "herbicide", quiet = TRUE)
+
+# Read the "seeding" table
+seed_species <- st_read(dsn = gdb_path, layer = "seed_species", quiet = TRUE)
+
+# Read the "related_projects" table
+related_projects <- st_read(dsn = gdb_path, layer = "related_project", quiet = TRUE)
+
+# Read the "project_identifiers" table
+# project_identifiers <- st_read(dsn = gdb_path, layer = "project_identifiers", quiet = TRUE)
+
+# Read the "related_treatments" table
+# related_treatments <- st_read(dsn = gdb_path, layer = "related_treatments", quiet = TRUE)
+
+
+# Reading in the equipment used within LTDL
+lookup_table_name_equipment <- "equipment_used"
 
 #### READING ####
 # Reading in the polygons

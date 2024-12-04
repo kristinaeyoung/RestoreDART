@@ -159,37 +159,49 @@ is_spatial_inherits <- inherits(final_year_sf, "sf")
 print(is_spatial_inherits)
 
 
-### STEP 4: Initiation and completion occur within roughly 3 years ###
-
-# Ensure initiation and completion year are the same
-result <- final_year_sf %>%
-  mutate(
-    Yer_cmp = as.numeric(Yer_cmp),
-    Year_nt = as.numeric(Year_nt)
-  ) %>%
-  filter((Yer_cmp - Year_nt) > 1) %>%
-  select(Prj_ID, Yer_cmp, Year_nt)
+#####################UPDATE STARTING HERE##############################
+### STEP 4: Initiation and completion occur within roughly 18 months ###
 
 # Drop geometry from result
 # result_df <- result %>%
-  # st_drop_geometry()
+# st_drop_geometry()
 
-# Filter by initiation and completion year range
-final_year_sf_filtered <- final_year_sf %>%
-  filter(Year_nt >= 1991 & Yer_cmp <= 2018)
+# Ensure initiation and completion year are the same
+# Filter records with a difference of 2 years and include initiation and completion dates
+result_years <- final_year_sf %>%
+  mutate(
+    Yer_cmp = as.numeric(Yer_cmp),  # Ensure end year is numeric
+    Year_nt = as.numeric(Year_nt)  # Ensure start year is numeric
+  ) %>%
+  filter((Yer_cmp - Year_nt) > 1) %>%  # Check for a 3-year difference
+  select(Prj_ID, Yer_cmp, Year_nt, Init_Dt, Comp_Dt)  # Include Init_Dt and Comp_Dt
+
+# Display the result
+result_years
+
+# Looking at the data. Perform a spatial semi-join to match rows
+three_year_sf <- final_year_sf %>%
+  filter(Prj_ID %in% result_years$Prj_ID)
 
 # Remove Prj_IDs from result to maintain spatial features in final data
-final_year_sf_filtered2 <- final_year_sf_filtered %>%
-  filter(!(Prj_ID %in% result$Prj_ID))
+final_year_sf_filtered <- final_year_sf %>%
+  filter(!(Prj_ID %in% result_years$Prj_ID))
 
-# Summarize treatments per Prj_ID
-result <- final_year_sf_filtered2 %>%
+# How many unique projects
+length(unique(final_year_sf_filtered$Prj_ID))
+
+# Filter by initiation and completion year range
+final_LTDL_sf <- final_year_sf_filtered %>%
+  filter(Year_nt >= 1991 & Yer_cmp <= 2018)
+
+# Summarize treatments per Prj_ID that have more than 1 Prj_ID
+result_info <- final_LTDL_sf %>%
   group_by(Prj_ID) %>%
   summarise(
     unique_Trt_IDs = n_distinct(Trt_ID)) %>%
   filter(unique_Trt_IDs > 1)
 
-length(unique(final_year_sf_filtered2$Prj_ID))
+length(unique(final_LTDL_sf$Prj_ID))
 
 # Print the final result
 # print(result)
@@ -206,20 +218,20 @@ valid_wetland_boundaries <- wetlands_UT %>%
   filter(st_is_valid(.))
 
 # Ensure coordinate reference system (CRS) matches and transform if necessary
-wetland_boundaries <- st_transform(valid_wetland_boundaries, st_crs(restoration_polygons_sf))
+wetland_boundaries <- st_transform(valid_wetland_boundaries, st_crs(final_year_sf_filtered))
 
 # Optionally, remove overlaps in wetland polygons
 wetland_boundaries_no_overlap <- st_union(wetland_boundaries)
 
 # Identify intersections with wetlands
-intersections <- st_intersects(wetland_boundaries_no_overlap, restoration_polygons_sf, sparse = FALSE)
+intersections <- st_intersects(wetland_boundaries_no_overlap, final_year_sf_filtered, sparse = FALSE)
 
 # Extract polygons intersecting with wetlands
 intersecting_indices <- which(rowSums(intersections) > 0)
-polys_intersecting <- restoration_polygons_sf[intersecting_indices, ]
+polys_intersecting <- final_year_sf_filtered[intersecting_indices, ]
 
 # Subset to polygons that do not intersect with wetlands
-restoration_filtered_sf <- restoration_polygons_sf[-intersecting_indices, ]
+restoration_filtered_sf <- final_year_sf_filtered[-intersecting_indices, ]
 
 beep(1)
 
