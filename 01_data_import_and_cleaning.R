@@ -30,7 +30,6 @@ lookup_table_name_treatment <- "treatment_info"
 # Reading in the project information from the geodatabase
 lookup_table_name_project <- "project_info"
 
-
 # Read the "equipment_used" table
 equipment_data <- st_read(dsn = gdb_path, layer = "equipment_used", quiet = TRUE)
 
