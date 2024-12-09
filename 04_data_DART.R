@@ -19,7 +19,7 @@
   # Uploading Data: go to Globus and log in
   # File Manager
   # Collecion: scinet_ceres
-  # Path /90daydata/aeroldc
+  # Path /project/aeroldc/RestoreDART/
   
   # 5: DART Landscape: 
       # GH -> DART -> DART_running -> needed to run DART

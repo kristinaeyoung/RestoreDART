@@ -13,6 +13,13 @@ library(sf)
 library(tidyverse)
 # Attach lubridate to deal with dates
 library(lubridate)
+# Session information
+library(sessioninfo)
+# 
+library(groundhog)
+
+sessionInfo()
+groundh
 
 #### CONFIG ####
 # Setting the path to the geodatabase 
